@@ -120,9 +120,20 @@ gtunet_create_log_item (LOG *log)
     }
 
   glog = (GtunetLog *)malloc(sizeof(GtunetLog));
-      
-  glog->tag = log->tag;
-  glog->str = log->str;
+  
+  buf = (char *)malloc(strlen(log->tag) + 1);
+  glog->tag = strcpy (buf, log->tag);
+  
+  if (strcmp(glog->tag, "MYTUNETSVC_LIMITATION") &&
+      strcmp(glog->tag, "MYTUNETSVC_STATE"))
+    {
+      buf = (char *)malloc(strlen(log->str) + 1);
+      glog->str = strcpy (buf, log->str);
+    }
+  else
+    {
+      glog->str = NULL;
+    }
   
   buf = (char *)malloc(log->datalen * 3 + 3);
   buf2hex(log->data, log->datalen, buf);
@@ -166,8 +177,22 @@ gtunet_process_log ()
    * TODO: Add code here
    *  change the status and print the info based on head
    */
-  printf("%s\n", head_log->tag);
-  
+  if (strcmp(head_log->tag, "MYTUNETSVC_LIMITATION") &&
+      strcmp(head_log->tag, "MYTUNETSVC_STATE"))
+    {
+      printf("gtunet: %s %s %s\n",
+             head_log->tag, head_log->data, head_log->str);
+    }
+  else
+    {
+      printf("gtunet: %s\n", head_log->tag);
+    }
+
+  free(head_log->tag);
+  if (head_log->str)
+    {
+      free(head_log->str);
+    }
   free(head_log->data);
   free(head_log);
   g_list_free_1(head);
@@ -188,6 +213,11 @@ gtunet_destroy_log_list ()
     {
       cur_log = (GtunetLog *)current->data;
 
+      free(cur_log->tag);
+      if (cur_log->str)
+        {
+          free(cur_log->str);
+        }
       free(cur_log->data);
       free(cur_log);
       
