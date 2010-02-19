@@ -38,7 +38,12 @@ VOID mytunetsvc_transmit_log_qt (LOG *log)
   glog = gtunet_create_log_item (log);
   if (glog)
     {
+      pthread_mutex_lock(&log_list_mutex);
+      
       gtunet_add_to_log_list (glog);
+      
+      pthread_cond_signal(&log_list_cond);
+      pthread_mutex_unlock(&log_list_mutex);
     }
 }
 

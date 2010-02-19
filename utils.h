@@ -30,3 +30,4 @@ GtunetLog *gtunet_create_log_item (LOG *log);
 void gtunet_add_to_log_list (GtunetLog *gtunet_log);
 void gtunet_process_log ();
 void gtunet_destroy_log_list ();
+void gtunet_update_state_icon (int state);

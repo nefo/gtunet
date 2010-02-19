@@ -30,6 +30,7 @@
 #include "mytunet/userconfig.h"
 #include "mytunet/logs.h"
 #include "mytunet/util.h"
+#include "mytunet/tunet.h"
 
 #include "gtunet.h"
 #include "pixdata.h"
@@ -145,12 +146,7 @@ gtunet_create_log_item (LOG *log)
 void
 gtunet_add_to_log_list (GtunetLog *glog)
 {
-  pthread_mutex_lock(&log_list_mutex);
-  
   log_list = g_list_append(log_list, glog);
-  pthread_cond_signal(&log_list_cond);
-
-  pthread_mutex_unlock(&log_list_mutex);
 }
 
 void
@@ -158,8 +154,8 @@ gtunet_process_log ()
 {
   GList *head;
   GtunetLog *head_log;
-  
-  pthread_mutex_lock(&log_list_mutex);
+  int len;
+  static int tunet_state = TUNET_STATE_NONE;
   
   while (log_list == NULL)
     {
@@ -167,15 +163,15 @@ gtunet_process_log ()
     }
   
   /*
-   * Process the log here
+   * 1. Get the head off the log list
    */
   head = log_list;
   head_log = (GtunetLog *)(head->data);
   log_list = log_list->next;
 
   /*
-   * TODO: Add code here
-   *  change the status and print the info based on head
+   * 2. Change the status and print the info based on head, essentially the same
+   *    as qtunet
    */
   if (strcmp(head_log->tag, "MYTUNETSVC_LIMITATION") &&
       strcmp(head_log->tag, "MYTUNETSVC_STATE"))
@@ -188,6 +184,90 @@ gtunet_process_log ()
       printf("gtunet: %s\n", head_log->tag);
     }
 
+  if (!strcmp(head_log->tag, "MYTUNETSVC_STATE"))
+    {
+      BYTE buf[100];
+      hex2buf(head_log->data, buf, &len);
+      tunet_state = buf[1];
+
+      gtunet_update_state_icon(tunet_state);
+    }
+
+  if (!strcmp(head_log->tag, "TUNET_START"))
+    {
+      gtunet_textview_info_append("[TUNET]", "Starting", "...");
+    }
+  if (!strcmp(head_log->tag, "TUNET_LOGON_SEND_TUNET_USER"))
+    {
+      gtunet_textview_info_append("[TUNET]", "Sending username", "...");
+    }
+  if (!strcmp(head_log->tag, "TUNET_LOGON_WELCOME"))
+    {
+      gtunet_textview_info_append("[TUNET]", "Welcome message:", head_log->str);
+    }
+  if (!strcmp(head_log->tag, "TUNET_LOGON_MONEY"))
+    {
+      gtunet_textview_info_append("[TUNET]", "Tunet account:(Yuan)",
+                                  head_log->str);
+      gtk_label_set_text(label_account_money, head_log->str);
+      gtk_label_set_text(label_used_money, "0.00");
+    }
+  if (!strcmp(head_log->tag, "TUNET_LOGON_IPs"))
+    {
+      gtunet_textview_info_append("[TUNET]", "Logon IPs:", head_log->str);
+    }
+  if (!strcmp(head_log->tag, "TUNET_LOGON_SERVERTIME"))
+    {
+      gtunet_textview_info_append("[TUNET]", "Server time:", head_log->str);
+    }
+  if (!strcmp(head_log->tag, "TUNET_LOGON_LASTTIME"))
+    {
+      gtunet_textview_info_append("[TUNET]", "Last logon time:", head_log->str);
+    }
+  if (!strcmp(head_log->tag, "TUNET_LOGON_MSG"))
+    {
+      gtunet_textview_info_append("[TUNET]", "Logon message:", head_log->str);
+    }
+  if (!strcmp(head_log->tag, "TUNET_KEEPALIVE_MONEY"))
+    {
+      gtk_label_set_text(label_account_money, head_log->str);
+    }
+  if (!strcmp(head_log->tag, "TUNET_KEEPALIVE_USED_MONEY"))
+    {
+      gtk_label_set_text(label_used_money, head_log->str);
+    }
+  if (!strcmp(head_log->tag, "TUNET_NETWORK_ERROR"))
+    {
+      gtunet_textview_info_append("[TUNET]", "Network error:", head_log->str);
+    }
+  if (!strcmp(head_log->tag, "TUNET_ERROR"))
+    {
+      gtunet_textview_info_append("[TUNET]", "TUNET ERROR!!!", head_log->str);
+    }
+  if (!strcmp(head_log->tag, "TUNET_KEEPALIVE_ERROR"))
+    {
+      gtunet_textview_info_append("[TUNET]", "Keepalive error:", head_log->str);
+    }
+  if (!strcmp(head_log->tag, "TUNET_STOP"))
+    {
+      gtunet_textview_info_append("[TUNET]", "Stopping", "...");
+    }
+  if (!strcmp(head_log->tag, "TUNET_LOGON_SEND_LOGOUT"))
+    {
+      gtunet_textview_info_append("[TUNET]", "Sending logout", "...");
+    }
+  if (!strcmp(head_log->tag, "TUNET_LOGOUT_MSG"))
+    {
+      gtunet_textview_info_append("[TUNET]", "Logout message:", head_log->str);
+    }
+  if (!strcmp(head_log->tag, "TUNET_LOGOUT"))
+    {
+      gtunet_textview_info_append("[TUNET]", "Logout successfully.", "");
+    }
+  
+  /*
+   * 3. Destroy the log list head
+   */
   free(head_log->tag);
   if (head_log->str)
     {
@@ -196,8 +276,6 @@ gtunet_process_log ()
   free(head_log->data);
   free(head_log);
   g_list_free_1(head);
-  
-  pthread_mutex_unlock(&log_list_mutex);
 }
 
 void
@@ -205,8 +283,6 @@ gtunet_destroy_log_list ()
 {
   GList *current;
   GtunetLog *cur_log;
-
-  pthread_mutex_lock(&log_list_mutex);
   
   current = log_list;
   while (current)
@@ -226,6 +302,31 @@ gtunet_destroy_log_list ()
 
   g_list_free(log_list);
   log_list = NULL;
+}
 
-  pthread_mutex_unlock(&log_list_mutex);
+void
+gtunet_update_state_icon (int state)
+{
+  if (state == TUNET_STATE_NONE)
+    {
+      gtunet_set_status_from_pixbuf(pixbuf_status_none);
+      return;
+    }
+  if (state != TUNET_STATE_KEEPALIVE)
+    {
+      gtunet_set_status_from_pixbuf(pixbuf_status_busy);
+      return;
+    }
+  switch (user_config.limitation)
+    {
+    case LIMITATION_CAMPUS:
+      gtunet_set_status_from_pixbuf(pixbuf_status_campus);
+      break;
+    case LIMITATION_NONE:
+      gtunet_set_status_from_pixbuf(pixbuf_status_nolimit);
+      break;
+    case LIMITATION_DOMESTIC:
+      gtunet_set_status_from_pixbuf(pixbuf_status_domestic);
+      break;
+    }
 }

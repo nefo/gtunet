@@ -43,7 +43,6 @@ on_entry_password_changed (GtkWidget *widget, gpointer data)
 void
 on_button_login_clicked (GtkWidget *widget, gpointer data)
 {
-  pthread_mutex_lock(&log_list_mutex);
   /*
    * If the thread is running, just return
    */
@@ -68,6 +67,8 @@ on_button_login_clicked (GtkWidget *widget, gpointer data)
   /*
    * 2. Start mytunet service.
    */
+  pthread_mutex_lock(&log_list_mutex);
+  
   gtunet_start_mytunet_service();
   
   pthread_mutex_unlock(&log_list_mutex);

@@ -43,6 +43,7 @@ gtunet_start_mytunet_service ()
   mytunetsvc_set_global_config_from(&user_config);
   
   puts("Start mytunet service thread ...");
+  
   if (pthread_create(&mytunet_service_tid,
                      NULL,
                      gtunet_mytunet_service_thread,
@@ -72,14 +73,15 @@ gtunet_stop_mytunet_service ()
       mytunet_service_tid = 0;
     }
   
-  pthread_mutex_unlock(&log_list_mutex);
-  
   if (log_list)
     {
       gtunet_destroy_log_list();
     }
   
   gtunet_clear_money_label();
+  gtunet_set_status_from_pixbuf(pixbuf_status_none);
+  
+  pthread_mutex_unlock(&log_list_mutex);
 }
 
 void
@@ -234,7 +236,9 @@ gtunet_log_process_thread(void *data)
 {
   while (1)
     {
+      pthread_mutex_lock(&log_list_mutex);
       gtunet_process_log();
+      pthread_mutex_unlock(&log_list_mutex);
     }
 
   return NULL;
